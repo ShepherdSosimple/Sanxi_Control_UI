@@ -6,17 +6,16 @@ Functions: search_origin()
 Author: Mr SoSimple
 """
 
-
 import threading
 
 from communication import Message_control
 import time
 
-class Sanxi(Message_control):
 
-    __VE_MAX = 250000  #最大速度
-    __AC_MAX = 250000  #最大加速度
-    __DE_MAX = 250000  #最大减速度
+class Sanxi(Message_control):
+    __VE_MAX = 250000  # 最大速度
+    __AC_MAX = 250000  # 最大加速度
+    __DE_MAX = 250000  # 最大减速度
 
     def __init__(self):
         super(Sanxi, self).__init__()
@@ -59,7 +58,6 @@ class Sanxi(Message_control):
         time.sleep(0.2)
         self.send('\x10')
         time.sleep(0.1)
-
 
     def set_motion_para(self, vep, acp, dep):
         """
@@ -116,7 +114,7 @@ class Sanxi(Message_control):
         """
         send_data = 'G00 '
         all_keys = []
-        for i in range(1,7):
+        for i in range(1, 7):
             all_keys.append('J{}'.format(str(i)))
         for key in all_keys:
             if j_dict[key] and (j_dict[key] != ' '):
@@ -132,7 +130,7 @@ class Sanxi(Message_control):
         :param is_positive: True-顺时针或 向上, False-逆时针或向下
         :return:
         """
-        if n in [2,3,5]:
+        if n in [2, 3, 5]:
             if is_positive:
                 send_data = 'J{}+\n'.format(str(n))
             else:
@@ -144,7 +142,6 @@ class Sanxi(Message_control):
                 send_data = 'J{}+\n'.format(str(n))
         self.changeto_mode14()
         self.send(send_data)
-
 
     def single_joint_motion_stop(self, n):
         """
