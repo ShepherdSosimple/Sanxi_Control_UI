@@ -133,21 +133,20 @@ class Sanxi_window(Sanxi, QtWidgets.QWidget, Ui_Sanxi_form):
         if not self.is_connected():
             self.not_connect_dialog()
         else:
-            resetquit_thread = threading.Thread(target=self.thread_func_resetquit,
+            resetquit_thread = threading.Thread(target=self.thread_func_reset_quit,
                                                 name='Thread-resetquit')
             resetquit_thread.start()
             resetquit_thread.join()
-            print('resetquit_thread has dead')
             QCoreApplication.quit()
 
-    def thread_func_resetquit(self):
-        print(threading.current_thread().name)
+    def thread_func_reset_quit(self):
         self.back2origin(wait=True)
         self.stop()
+        self.stop_refresh()
         self.disconnect()
 
     ##############################Fundamental Functions##############################
-    #读直角坐标文本框值
+    # 读直角坐标文本框值
     def read_rect_lineEdit(self):
         rect_dict = {'X': self.xread_lineEdit.text(),
                      'Y': self.yread_lineEdit.text(),
@@ -157,7 +156,7 @@ class Sanxi_window(Sanxi, QtWidgets.QWidget, Ui_Sanxi_form):
                      'C': self.cread_lineEdit.text()}
         return rect_dict
 
-    #读关节坐标文本框值
+    # 读关节坐标文本框值
     def read_angle_lineEdit(self):
         j_dict = {'J1': self.j1read_lineEdit.text(),
                   'J2': self.j2read_lineEdit.text(),
@@ -167,26 +166,26 @@ class Sanxi_window(Sanxi, QtWidgets.QWidget, Ui_Sanxi_form):
                   'J6': self.j6read_lineEdit.text()}
         return j_dict
 
-    #直角坐标点对点运动
+    # 直角坐标点对点运动
     def p2p_pushButton_clicked(self):
         rect_dict = self.read_rect_lineEdit()
         rect_dict['D'] = '0'
         self.rect_move(mode='p2p', **rect_dict)
 
-    #直角坐标直线运动
+    # 直角坐标直线运动
     def goline_pushButton_clicked(self):
         rect_dict = self.read_rect_lineEdit()
         rect_dict['D'] = '0'
         self.rect_move(mode='line', **rect_dict)
 
-    #按轴角度运动
+    # 按轴角度运动
     def goangle_pushButton_clicked(self):
         j_dict = self.read_angle_lineEdit()
         self.multi_joints_motion(**j_dict)
 
-    #发送命令
+    # 发送命令
     def sendcode_pushButton_clicked(self):
-        data_list = self.sendcode_textEdit.toPlainText().split(sep='\n') #拆分多行命令，间隔0.1秒发送
+        data_list = self.sendcode_textEdit.toPlainText().split(sep='\n')  # 拆分多行命令，间隔0.1秒发送
         self.changeto_mode14()
         for send_data in data_list:
             if send_data:
@@ -277,11 +276,11 @@ class Sanxi_window(Sanxi, QtWidgets.QWidget, Ui_Sanxi_form):
             self.return_code = self.message
             self.returncode_textBrowser.append(self.return_code)
             # refresh value
-            jn_match = self.jn_pattern.match(str(self.return_code)) # 正则表达式匹配
+            jn_match = self.jn_pattern.match(str(self.return_code))  # 正则表达式匹配
             xyz_match = self.xyz_pattern.match(str(self.return_code))
             if jn_match:
                 self.jn_value.clear()
-                for i in range(1,7):
+                for i in range(1, 7):
                     self.jn_value.append(jn_match.group(i))
                 # 显示关节坐标
                 self.j1show_lineEdit.setText(self.jn_value[0])
@@ -292,7 +291,7 @@ class Sanxi_window(Sanxi, QtWidgets.QWidget, Ui_Sanxi_form):
                 self.j6show_lineEdit.setText(self.jn_value[5])
             if xyz_match:
                 self.xyz_value.clear()
-                for i in range(1,8):
+                for i in range(1, 8):
                     self.xyz_value.append(xyz_match.group(i))
                 self.xshow_lineEdit.setText(self.xyz_value[0])
                 self.yshow_lineEdit.setText(self.xyz_value[1])

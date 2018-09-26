@@ -17,6 +17,7 @@ class RS232(object):
     def __init__(self):
         super(RS232, self).__init__()
         self.__baudrate = 115200
+        self.__timeout = 0.2
         # 串口状态机
         self.__connect_state = False  #串口打开状态
         self.__ser = serial.Serial()
@@ -26,8 +27,10 @@ class RS232(object):
 
     def connect(self):
         try:
+            #设置端口、波特率、接收超时
             self.__ser.port = self.__portname
             self.__ser.baudrate = self.__baudrate
+            self.__ser.timeout = self.__timeout
             self.__ser.open()
         except Exception as e:
             print('Connect data error: ', e)
@@ -66,7 +69,8 @@ class RS232(object):
 
     def receive(self):
         try:
-            return self.__ser.readline().decode()
+            receive_data = self.__ser.readline().decode()
+            return receive_data
         except Exception as e:
             print('Receive data error: ', e)
 
@@ -78,8 +82,9 @@ class Message_control(RS232):
 
     def __thread_func_refresh(self):
         while not self.__stopped:
-            self.message = self.receive()
-            print(self.message)
+            temp = self.receive()
+            if temp:
+                self.message = temp
 
     def start_refresh(self):
         self.__stopped = False

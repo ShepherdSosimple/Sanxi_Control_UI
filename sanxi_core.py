@@ -48,7 +48,7 @@ class Sanxi(Message_control):
         if wait:
             while self.message != '\x10':
                 self.send('\x05')
-                time.sleep(0.5)
+                time.sleep(0.3)
 
     def stop(self):
         """
