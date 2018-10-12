@@ -3,23 +3,25 @@ This module includes the core functions of Geomagic touch haptic device.
 Class:  Geo_touch
 Methods:    hd_init_device(self, config_name = '')
             hd_get_current_device(self)
-            hd_begin_frame(self, geo_touch_handle)
-            hd_end_frame(self, geo_touch_handle)
-
-            hd_get_current_position_double(self)
-            hd_get_current_velocity_double(self)
-            hd_get_current_gimbal_angles_double(self)
-
 
             hd_start_scheduler(self)
             hd_stop_scheduler(self)
             hd_schedule_synchronous(self, hd_callback_func)
             hd_schedule_asynchronous(self, hd_callback_func):
+
+            hd_begin_frame(self, geo_touch_handle)
+            hd_end_frame(self, geo_touch_handle)
+
+            hd_get_current_position_double(self)
+            hd_get_current_gimbal_angles_double(self, mode='deg')
+            hd_get_current_joint_angles_double(self, mode='deg')
+            hd_get_current_buttons(self)
+            hd_get_current_velocity_double(self)  # 该方法尚有bug
 """
 
 
-from ctypes import *
 import threading
+from ctypes import *
 
 
 HHD = c_uint
@@ -35,10 +37,10 @@ type_HDdouble_array_3 = HDdouble * 3  # ctypes数组
 type_HDfloat_array_3 = HDfloat * 3
 
 
-class Geo_touch(object):
+class GeoTouch(object):
     def __init__(self):
 
-        super(Geo_touch, self).__init__()
+        super(GeoTouch, self).__init__()
 
         self.rad_to_deg = 57.29578
         self.geo_touch_dll = windll.LoadLibrary('hd.dll')  # 加载 hd.dll动态库
@@ -58,7 +60,7 @@ class Geo_touch(object):
         self.geo_touch_dll.hdInitDevice.restype = HHD
         return self.geo_touch_dll.hdInitDevice(config_name.encode())
 
-    def hd_schedule_synchronous(self, hd_callback_func, priority = 30000):
+    def hd_schedule_synchronous(self, hd_callback_func, priority = 50000):
         """
         部署一个同步任务，传入一个ctypes回调函数
         :param hd_callback_func: 回调函数——用装饰器 @CFUNCTYPE(HDCallbackCode)装饰——第一个参数为返回值，后面参数为传入参数
@@ -67,7 +69,7 @@ class Geo_touch(object):
         """
         self.geo_touch_dll.hdScheduleSynchronous(hd_callback_func, byref(c_int(0)), HDushort(priority))
 
-    def hd_schedule_asynchronous(self, hd_callback_func, priority = 30000):
+    def hd_schedule_asynchronous(self, hd_callback_func, priority = 50000):
         """
         部署一个异步任务，传入一个ctypes回调函数
         :param hd_callback_func: 回调函数——用装饰器 @CFUNCTYPE(HDCallbackCode)装饰——第一个参数为返回值，后面参数为传入参数
@@ -138,7 +140,7 @@ class Geo_touch(object):
 
     # def hd_get_current_velocity_double(self):
     #     """
-    #     获取当前帧的双精度速度
+    #     获取当前帧的双精度速度, 该方法尚有bug
     #     :return: 3 double元素的list=[x, y, z]，单位——mm/s
     #     """
     #     velocity_array = type_HDdouble_array_3(0, 0, 0)
@@ -203,11 +205,12 @@ class Geo_touch(object):
 #     return 1
 #
 #
-# geo_touch = Geo_touch()
-# hHd = geo_touch.hd_init_device('Default Device')
-# print(hHd)
-# geo_touch.hd_schedule_synchronous(hd_callback_func1)
-# geo_touch.hd_start_scheduler()
+# if __name__ == '__main__':
+#     geo_touch = GeoTouch()
+#     hHd = geo_touch.hd_init_device('Default Device')
+#     print(hHd)
+#     geo_touch.hd_schedule_synchronous(hd_callback_func1)
+#     geo_touch.hd_start_scheduler()
 
 
 
