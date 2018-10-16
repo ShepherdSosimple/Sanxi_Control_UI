@@ -80,7 +80,7 @@
         </font>
        </property>
        <property name="value">
-        <number>3</number>
+        <number>4</number>
        </property>
       </widget>
      </item>
@@ -1366,11 +1366,20 @@ p, li { white-space: pre-wrap; }
        <bold>false</bold>
       </font>
      </property>
+     <property name="mouseTracking">
+      <bool>false</bool>
+     </property>
+     <property name="autoFillBackground">
+      <bool>false</bool>
+     </property>
      <property name="verticalScrollBarPolicy">
       <enum>Qt::ScrollBarAsNeeded</enum>
      </property>
      <property name="horizontalScrollBarPolicy">
       <enum>Qt::ScrollBarAsNeeded</enum>
+     </property>
+     <property name="sizeAdjustPolicy">
+      <enum>QAbstractScrollArea::AdjustIgnored</enum>
      </property>
     </widget>
    </widget>

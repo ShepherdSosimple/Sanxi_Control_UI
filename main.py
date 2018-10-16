@@ -5,6 +5,6 @@ from PyQt5.QtWidgets import QApplication
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    myshow = Sanxi_window()
-    myshow.show()
+    my_show = Sanxi_window()
+    my_show.show()
     sys.exit(app.exec_())

@@ -3,28 +3,23 @@ This module includes the functions of sanxiUI.
 Related modules: sanxi_core.py, Sanxi_CtrlUI.py
 Author:Mr Sosimple
 """
-from sanxi_core import Sanxi
-from Sanxi_CtrlUI import Ui_Sanxi_form
-from PyQt5 import QtWidgets
-from PyQt5.QtWidgets import QMessageBox
+
+
 import threading
+
+from PyQt5 import QtWidgets
+from PyQt5 import QtGui
+from PyQt5.QtWidgets import QMessageBox
 from PyQt5.QtCore import QCoreApplication
-import time
-from PyQt5.QtCore import QTimer
-import re
+
+import sanxi_core
+import Sanxi_CtrlUI
 
 
-class Sanxi_window(Sanxi, QtWidgets.QWidget, Ui_Sanxi_form):
+class Sanxi_window(sanxi_core.Sanxi, QtWidgets.QWidget, Sanxi_CtrlUI.Ui_Sanxi_form):
     def __init__(self):
         super(Sanxi_window, self).__init__()
         self.setupUi(self)
-
-        self.return_code = ''
-        self.jn_value = []
-        self.xyz_value = []
-        # 正则表达式预编译
-        self.jn_pattern = re.compile(r'.*J1=(.*) J2=(.*) J3=(.*) J4=(.*) J5=(.*) J6=(.*)[\r\s]')
-        self.xyz_pattern = re.compile(r'.*X=(.*) Y=(.*) Z=(.*) A=(.*) B=(.*) C=(.*) D=(.*)[\r\s]')
         # communication/start up
         self.connect_pushButton.clicked.connect(self.connect_pushButton_clicked)
         self.searchorigin_pushButton.clicked.connect(self.searchorigin_pushButton_clicked)
@@ -42,10 +37,14 @@ class Sanxi_window(Sanxi, QtWidgets.QWidget, Ui_Sanxi_form):
         self.goangle_pushButton.clicked.connect(self.goangle_pushButton_clicked)
         self.sendcode_pushButton.clicked.connect(self.sendcode_pushButton_clicked)
         # display board-timer
-        self.display_board_timer = QTimer(self)
-        self.display_board_timer.start(100)
-        self.display_board_timer.timeout.connect(self.display_board)
+        # self.display_board_timer = QTimer(self)
+        # self.display_board_timer.start(1)
+        # self.display_board_timer.timeout.connect(self.display_board)
+        self.display_board_timer = threading.Timer(0.005, self.display_board)
+        self.display_board_timer.start()
         # display board-control button
+        self.coordinate_display_mode_flag = 1  # 1为笛卡尔坐标  0位关节空间坐标
+        self.add_show_code = ''
         self.rectmode_pushButton.clicked.connect(self.rectmode_pushButton_clicked)
         self.anglemode_pushButton.clicked.connect(self.anglemode_pushButton_clicked)
         # single joint jogging
@@ -81,12 +80,11 @@ class Sanxi_window(Sanxi, QtWidgets.QWidget, Ui_Sanxi_form):
     ##############################communication/start up##############################
     def connect_pushButton_clicked(self):
         port_number = self.port_spinBox.value()
-        portname = 'COM' + str(port_number)
-        self.set_port(portname)
-        if self.connect():
-            QMessageBox.information(self, 'Info', 'Connected!', QMessageBox.Yes)
-            self.start_refresh()
+        port_name = 'COM' + str(port_number)
+        if self.connect_sanxi(port_name):
+            self.start_update_sanxi_output()
             self.motionparaOK_pushButton_clicked()
+            # QMessageBox.information(self, 'Info', 'Connected!', QMessageBox.Yes)
         else:
             QMessageBox.information(self, 'Warning', 'Connect Failed', QMessageBox.Yes)
 
@@ -96,8 +94,8 @@ class Sanxi_window(Sanxi, QtWidgets.QWidget, Ui_Sanxi_form):
         self.search_origin()
 
     def disconnct_pushButton_clicked(self):
-        self.stop_refresh()
-        self.disconnect()
+        self.stop_update_sanxi_output()
+        self.disconnect_sanxi()
 
     ##############################motion parameters###########################
     def motionparaOK_pushButton_clicked(self):
@@ -137,12 +135,13 @@ class Sanxi_window(Sanxi, QtWidgets.QWidget, Ui_Sanxi_form):
                                                 name='Thread-resetquit')
             resetquit_thread.start()
             resetquit_thread.join()
+            self.display_board_timer.cancel()  # 退出系统前停止其他线程和定时器
             QCoreApplication.quit()
 
     def thread_func_reset_quit(self):
         self.back2origin(wait=True)
         self.stop()
-        self.stop_refresh()
+        self.stop_update_sanxi_output()
         self.disconnect()
 
     ##############################Fundamental Functions##############################
@@ -271,34 +270,36 @@ class Sanxi_window(Sanxi, QtWidgets.QWidget, Ui_Sanxi_form):
         显示接收代码，显示关节坐标值或直角坐标值
         :return:
         """
-        if self.return_code != self.message:
+        # print('enter display func')
+        if self.add_show_code != self.return_code:
+            # print('if 1')
+            # print(self.xyz_value)
             # refresh return_code text_browser
-            self.return_code = self.message
-            self.returncode_textBrowser.append(self.return_code)
+            self.add_show_code = self.return_code
+            # print('add show code=', self.add_show_code)
+            self.returncode_textBrowser.append(self.add_show_code)
+            self.returncode_textBrowser.moveCursor(QtGui.QTextCursor.End)
+            # self.returncode_textBrowser.ensureCursorVisible()
             # refresh value
-            jn_match = self.jn_pattern.match(str(self.return_code))  # 正则表达式匹配
-            xyz_match = self.xyz_pattern.match(str(self.return_code))
-            if jn_match:
-                self.jn_value.clear()
-                for i in range(1, 7):
-                    self.jn_value.append(jn_match.group(i))
-                # 显示关节坐标
+            if self.jn_value and self.coordinate_display_mode_flag==0:
+                # print(self.jn_value)
                 self.j1show_lineEdit.setText(self.jn_value[0])
                 self.j2show_lineEdit.setText(self.jn_value[1])
                 self.j3show_lineEdit.setText(self.jn_value[2])
                 self.j4show_lineEdit.setText(self.jn_value[3])
                 self.j5show_lineEdit.setText(self.jn_value[4])
                 self.j6show_lineEdit.setText(self.jn_value[5])
-            if xyz_match:
-                self.xyz_value.clear()
-                for i in range(1, 8):
-                    self.xyz_value.append(xyz_match.group(i))
+            if self.xyz_value and self.coordinate_display_mode_flag==1:
+                # print('in xyz', self.xyz_value[1])
                 self.xshow_lineEdit.setText(self.xyz_value[0])
                 self.yshow_lineEdit.setText(self.xyz_value[1])
                 self.zshow_lineEdit.setText(self.xyz_value[2])
                 self.ashow_lineEdit.setText(self.xyz_value[3])
                 self.bshow_lineEdit.setText(self.xyz_value[4])
                 self.cshow_lineEdit.setText(self.xyz_value[5])
+        self.display_board_timer = threading.Timer(0.005, self.display_board)
+        self.display_board_timer.start()
+        # print('leave display func')
 
     def rectmode_pushButton_clicked(self):
         """
@@ -311,7 +312,8 @@ class Sanxi_window(Sanxi, QtWidgets.QWidget, Ui_Sanxi_form):
         self.j4show_lineEdit.clear()
         self.j5show_lineEdit.clear()
         self.j6show_lineEdit.clear()
-        self.send('G07 GCM=1\n')
+        self.set_return_data_mode('cartesian space')
+        self.coordinate_display_mode_flag = 1
 
     def anglemode_pushButton_clicked(self):
         """
@@ -324,4 +326,5 @@ class Sanxi_window(Sanxi, QtWidgets.QWidget, Ui_Sanxi_form):
         self.ashow_lineEdit.clear()
         self.bshow_lineEdit.clear()
         self.cshow_lineEdit.clear()
-        self.send('G07 GCM=0\n')
+        self.set_return_data_mode('joint space')
+        self.coordinate_display_mode_flag = 0
