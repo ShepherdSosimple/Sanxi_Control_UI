@@ -16,20 +16,26 @@ import threading
 class RS232(object):
     def __init__(self):
         super(RS232, self).__init__()
-        self.__baudrate = 115200
-        self.__timeout = 0.2
+        self.__baud_rate = 115200
+        self.__timeout = 0.1
         # 串口状态机
         self.__connect_state = False  # 串口打开状态
         self.__ser = serial.Serial()
 
-    def set_port(self, portname):
-        self.__portname = portname
+    def set_port(self, port_name):
+        self.__portname = port_name
+
+    def set_baud_rate(self, baud_rate):
+        self.__baud_rate = baud_rate
+
+    def set_timeout(self, timeout):
+        self.__timeout = timeout
 
     def connect(self):
         try:
             # 设置端口、波特率、接收超时
             self.__ser.port = self.__portname
-            self.__ser.baudrate = self.__baudrate
+            self.__ser.baudrate = self.__baud_rate
             self.__ser.timeout = self.__timeout
             self.__ser.open()
         except Exception as e:

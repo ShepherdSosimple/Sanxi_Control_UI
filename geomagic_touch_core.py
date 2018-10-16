@@ -1,6 +1,6 @@
 """
 This module includes the core functions of Geomagic touch haptic device.
-Class:  Geo_touch
+Class:  GeoTouch
 Methods:    hd_init_device(self, config_name = '')
             hd_get_current_device(self)
 
@@ -21,6 +21,7 @@ Methods:    hd_init_device(self, config_name = '')
 
 
 import threading
+import time
 from ctypes import *
 
 
@@ -35,22 +36,30 @@ HDlong = c_long
 HDerror = c_uint
 type_HDdouble_array_3 = HDdouble * 3  # ctypes数组
 type_HDfloat_array_3 = HDfloat * 3
+type_HDdouble_array_10 = HDdouble * 10
 
 
-class GeoTouch(object):
+class GeoTouchLower(object):
     def __init__(self):
 
-        super(GeoTouch, self).__init__()
+        super(GeoTouchLower, self).__init__()
 
         self.rad_to_deg = 57.29578
         self.geo_touch_dll = windll.LoadLibrary('hd.dll')  # 加载 hd.dll动态库
         self.callback_flag = False  # 回调函数执行标志 False: 不执行  True: 可执行
+        self.schedule_thread = threading.Thread(target=self.__schedule_thread_func, name='Schedule_Thread')
+        # touch设备状态参数
+        self.touch_handle = -1
+        self.touch_current_position = [0, 0, 0]
+        self.touch_current_gimbal_angles = [0, 0, 0]
+        self.touch_current_joint_angles = [0, 0, 0]
+        self.touch_button_state = 0
         # 约定ctypes函数参数
         self.geo_touch_dll.hdGetDoublev.argvtypes = [c_uint, POINTER(HDdouble)]
         self.geo_touch_dll.hdGetIntegerv.argvtypes = [c_uint, POINTER(HDint)]
         self.geo_touch_dll.hdGetBooleanv.argvtypes = [c_uint, POINTER(HDboolean)]
 
-    def hd_init_device(self, config_name = ''):
+    def hd_init_device(self, config_name=''):
         """
         初始化设备 Geomagic touch
         :param config_name: string 默认值='Default Device' 或 空字符
@@ -60,23 +69,23 @@ class GeoTouch(object):
         self.geo_touch_dll.hdInitDevice.restype = HHD
         return self.geo_touch_dll.hdInitDevice(config_name.encode())
 
-    def hd_schedule_synchronous(self, hd_callback_func, priority = 50000):
+    def hd_schedule_synchronous(self, hd_callback_func, params=c_uint(0), priority=50000):
         """
         部署一个同步任务，传入一个ctypes回调函数
         :param hd_callback_func: 回调函数——用装饰器 @CFUNCTYPE(HDCallbackCode)装饰——第一个参数为返回值，后面参数为传入参数
         :param priority: uint 优先级 默认值30000
         :return: None
         """
-        self.geo_touch_dll.hdScheduleSynchronous(hd_callback_func, byref(c_int(0)), HDushort(priority))
+        self.geo_touch_dll.hdScheduleSynchronous(hd_callback_func, byref(params), HDushort(priority))
 
-    def hd_schedule_asynchronous(self, hd_callback_func, priority = 50000):
+    def hd_schedule_asynchronous(self, hd_callback_func, params=c_uint(0), priority=50000):
         """
         部署一个异步任务，传入一个ctypes回调函数
         :param hd_callback_func: 回调函数——用装饰器 @CFUNCTYPE(HDCallbackCode)装饰——第一个参数为返回值，后面参数为传入参数
         :param priority: uint 优先级 默认值30000
         :return: None
         """
-        self.geo_touch_dll.hdScheduleAsynchronous(hd_callback_func, byref(c_int(0)), HDushort(priority))
+        self.geo_touch_dll.hdScheduleAsynchronous(hd_callback_func, byref(params), HDushort(priority))
 
     def hd_start_scheduler(self):
         """
@@ -84,7 +93,6 @@ class GeoTouch(object):
         :return: None
         """
         self.callback_flag = True
-        self.schedule_thread = threading.Thread(target=self.__schedule_thread_func, name='Schedule_Thread')
         self.schedule_thread.start()
 
     #线程目标函数
@@ -129,29 +137,29 @@ class GeoTouch(object):
         self.geo_touch_dll.hdEndFrame(geo_touch_handle)
 
     # 笔记：如何给ctypes函数传入数组变量——引用或指针均可
-    def hd_get_current_position_double(self):
+    def hd_get_current_position(self):
         """
-        获取当前帧的双精度位置
+        获取当前帧的位置
         :return: 3 double元素的list=[x, y, z]，单位——毫米
         """
         position_array = type_HDdouble_array_3(0, 0, 0)
         self.geo_touch_dll.hdGetDoublev(0x2050, position_array)
         return [position_array[0], position_array[1], position_array[2]]
 
-    # def hd_get_current_velocity_double(self):
+    # def hd_get_current_velocity(self):
     #     """
-    #     获取当前帧的双精度速度, 该方法尚有bug
-    #     :return: 3 double元素的list=[x, y, z]，单位——mm/s
+    #     获取当前帧的速度, 该方法尚有bug
+    #     :return: 3 float元素的list=[x, y, z]，单位——mm/s
     #     """
     #     velocity_array = type_HDdouble_array_3(0, 0, 0)
     #     self.geo_touch_dll.hdGetDoublev(0x2051, velocity_array)
     #     return [velocity_array[0], velocity_array[1], velocity_array[2]]
 
-    def hd_get_current_joint_angles_double(self, mode='deg'):
+    def hd_get_current_joint_angles(self, mode='deg'):
         """
-        获取当前帧的双精度本体关节角度值
+        获取当前帧的本体关节角度值
         :param mode: 设定返回值类型弧度或角度（默认deg） mode='deg' or 'rad'
-        :return: 3 double元素的list=[x, y, z]，单位——rad or degree
+        :return: 3 float元素的list=[x, y, z]，单位——rad or degree
         """
         joint_angles_array = type_HDdouble_array_3(0, 0, 0)
         self.geo_touch_dll.hdGetDoublev(0x2100, joint_angles_array)
@@ -164,11 +172,11 @@ class GeoTouch(object):
             return joint_angles
         return None
 
-    def hd_get_current_gimbal_angles_double(self, mode = 'deg'):
+    def hd_get_current_gimbal_angles(self, mode = 'deg'):
         """
-        获取当前帧的双精度万向节角度值
-        :param mode: 设定返回值类型弧度或角度（默认） mode='deg' or 'rad'
-        :return: 3 double元素的list=[x, y, z]，单位——rad or degree
+        获取当前帧的万向节角度值
+        :param mode: 设定返回值类型弧度或角度（默认deg） mode='deg' or 'rad'
+        :return: 3 float元素的list=[x, y, z]，单位——rad or degree
         """
         gimbal_angles_array = type_HDdouble_array_3(0, 0, 0)
         self.geo_touch_dll.hdGetDoublev(0x2150, gimbal_angles_array)
@@ -186,32 +194,67 @@ class GeoTouch(object):
     def hd_get_current_buttons(self):
         """
         获取当前帧按钮状态
-        :return: c_long  0-均未被按下   1-深色按钮按下    2-浅色按钮按下    3-均被按下
+        :return: int  0-均未被按下   1-深色按钮按下    2-浅色按钮按下    3-均被按下
         """
         n_buttons = c_int(0)  # 先创建一个ctypes对象
         self.geo_touch_dll.hdGetIntegerv(0x2000, byref(n_buttons))  # 然后再将该对象的引用byref 或指针pointer传入ctypes函数
-        return n_buttons
+        return n_buttons.value
 
 
-# EXAMPLE:
-# @CFUNCTYPE(HDCallbackCode)
-# def hd_callback_func1():
-#     geo_touch.hd_begin_frame(hHd)
-#     velocity = geo_touch.hd_get_current_velocity_double()
-#     for i in velocity:
-#         print(i, end=' ')
-#     print('\n')
-#     geo_touch.hd_end_frame(hHd)
+# class GeoTouchHigher(GeoTouchLower):
+#     def __init__(self):
+#         super(GeoTouchHigher, self).__init__()
+#
+#         self.touch_handle = -1
+#         self.touch_current_position = [0, 0, 0]
+#         self.touch_current_gimbal_angles = [0, 0, 0]
+#         self.touch_current_joint_angles = [0, 0, 0]
+#         self.touch_button_state = 0
+#         self.info_array_temp = type_HDdouble_array_10(0,0,0, 0,0,0, 0,0,0, 0)
+#
+#     def touch_start_refresh_info(self):
+#         self.touch_handle = self.hd_init_device('Default Device')
+#         temp_info = type_HDdouble_array_10(0,0,0, 0,0,0, 0,0,0, 0)
+#         if self.touch_handle < 0:
+#             return False
+#         else:
+#             self.hd_schedule_synchronous(hd_callback_func, temp_info)
+#             self.hd_start_scheduler()
+#             while True:
+#                 print(temp_info[3])
+#                 time.sleep(0.8)
+
+
+
+
+#
+# temp_touch_instance = GeoTouchLower()
+#
+#
+# @CFUNCTYPE(HDCallbackCode, POINTER(type_HDdouble_array_10))
+# def hd_callback_func(temp_info):
+#     hHd = temp_touch_instance.hd_get_current_device()
+#     temp_touch_instance.hd_begin_frame(hHd)
+#     position = temp_touch_instance.hd_get_current_position_double()
+#     joint_angels = temp_touch_instance.hd_get_current_joint_angles_double()
+#     gimbal_angles = temp_touch_instance.hd_get_current_gimbal_angles_double()
+#     button_state = temp_touch_instance.hd_get_current_buttons()
+#     for i in range(0, 3):
+#         temp_info[i] = c_double(position[i])
+#     for i in range(3, 6):
+#         temp_info[i] = c_double(joint_angels[i-3])
+#     for i in range(6, 9):
+#         temp_info[i] = c_double(gimbal_angles[i-6])
+#     # temp_info[9] = c_double(button_state)
 #     return 1
-#
-#
+
+
+# temp_touch_instance.hd_init_device('Default Device')
+# temp_touch_instance.hd_schedule_synchronous(hd_callback_func)
+# temp_touch_instance.hd_start_scheduler()
+
+
+
 # if __name__ == '__main__':
-#     geo_touch = GeoTouch()
-#     hHd = geo_touch.hd_init_device('Default Device')
-#     print(hHd)
-#     geo_touch.hd_schedule_synchronous(hd_callback_func1)
-#     geo_touch.hd_start_scheduler()
-
-
-
-
+#     geo_touch = GeoTouchHigher()
+#     geo_touch.touch_start_refresh_info()
